@@ -62,7 +62,7 @@ class Stall(object):
 		#执行模板匹配，采用的匹配方式cv2.TM_CCORR_NORMED
 		result = cv2.matchTemplate(target, template,cv2.TM_CCORR_NORMED)
 		threshold = 0.99
-		print('sim: %s' % str(cv2.minMaxLoc(result)[1])[:4])
+		#print('[INFO] Image Similarity: %s' % str(cv2.minMaxLoc(result)[1])[:4])
 		if cv2.minMaxLoc(result)[1] > threshold:
 			return True
 		return False
@@ -74,55 +74,61 @@ class Stall(object):
 		pyautogui.click(x=mark[0],  y=mark[1]+30, button='left')
 		time.sleep(0.3)
 		self.stall_now += 1
-		print('set Mark')
+		#print('set Mark')
 		if self.stall_now == 13:
-			print('mark 13, exit')
+			print('[INFO] Marked 12 Stalls, exit')
 			os._exit(1)
 
 	def scan(self, targets):
 		count = 0
 		time.sleep(1)
-		target_goods = []
+		target_goods, target_items = [], []
 		for target in targets:
 			target_good = Image.open(target)
 			target_good = cv2.cvtColor(numpy.asarray(target_good),cv2.COLOR_RGB2BGR)
 			target_goods.append(target_good)
+			target_items.append(target.split('\\')[-1].split('.')[0])
 		self.stall_now = 1
 		stall_dir = self.coordinate('stall')
 		while True:
-			print('\n[INFO] COUNT: %s' % str(count))
+			#print('\n[INFO] COUNT: %s' % str(count))
 			#刷新摊位
 			refresh_xy = self.coordinate('object', 'stall_refresh')
 			pyautogui.click(x=refresh_xy[0],  y=refresh_xy[1], button='left')
-			print('refresh')
+			#print('refresh')
 			#检查是否扫过
 			stall_now_now_xy = stall_dir['stall_%s' % str(self.stall_now)]
 			stall_now_img = self.screenshot(stall_now_now_xy[0], stall_now_now_xy[1])
 			empty = self.matchColour(stall_now_img, self.coordinate('colour', 'stall_visited')[0])
 			#print(self.coordinate('colour', 'stall_visited')[0])
-			print('check')
+			#print('check')
 			if not empty:
 				#点击摊位
 				xy = stall_dir['stall_%s_click' % str(self.stall_now)]
 				pyautogui.click(x=xy[0],  y=xy[1], button='left')
 				time.sleep(0.3)
-				print('click')
+				#print('click')
 				#摊位截图
 				stall_img = self.screenshot(self.coordinate('object', 'stall_goods')[0], self.coordinate('object', 'stall_goods')[1])
 				#stall_img.save('%s.png' % str(count))
-				print('get goods')
+				#print('get goods')
 				# 匹配物品
 				stall_img = cv2.cvtColor(numpy.asarray(stall_img), cv2.COLOR_RGB2BGR)
-				for target_good in target_goods:
-					match = self.matchIMG(target=stall_img, template=target_good)
+				match_list = [] #同一店铺多个匹配只标记一次
+				for i in range(len(target_goods)):
+					match = self.matchIMG(target=stall_img, template=target_goods[i])
 					if match:
-						self.setMark()
+						if match_list == []:
+							self.setMark()
+						match_list.append(target_items[i])
 						continue
+				if match_list:
+					print('[INFO] Found item: %s' % ','.join(match_list))
 				#if count == 1:
 				#	break
 				count += 1
 			else:
-				print('exit')
+				print('[INFO] All Stalls(%s) have been scaned, exit.' % str(count))
 				break
 
 
